@@ -23,7 +23,7 @@ public class Board extends Group {
     final Group cardSlotGroup = new Group();
     final Group cardOnBoardGroup = new Group();
     final Rectangle[][] cardSlotBounds = new Rectangle[TOTAL_COLUMN][TOTAL_ROW];
-    final Card[][] cardOnBoard = new Card[TOTAL_COLUMN][TOTAL_ROW];
+    Card[][] cardOnBoard = new Card[TOTAL_COLUMN][TOTAL_ROW];
     final Player player;
 
     public Board(Player player) {
@@ -35,6 +35,7 @@ public class Board extends Group {
     public void initializeBoard() {
         cardSlotGroup.clearChildren();
         cardOnBoardGroup.clearChildren();
+        cardOnBoard = new Card[TOTAL_COLUMN][TOTAL_ROW];
         for (int row = 0; row < TOTAL_ROW; row++) {
             blackDeck[row] = new ArrayDeque<>();
             for (int i = 0; i < CARD_PER_ROW; i++) {
@@ -51,7 +52,7 @@ public class Board extends Group {
                 cardSlotGroup.addActor(cardslot);
                 cardslot.setBounds(bound.x, bound.y, bound.width, bound.height);
 
-                if (col == TOTAL_COLUMN - 1) {
+                if (col >= TOTAL_COLUMN - 2) {
                     continue;
                 }
                 Card card = blackDeck[row].poll();
@@ -107,11 +108,20 @@ public class Board extends Group {
         card.addAction(sequenceAction);
     }
 
-    public void moveCard(Card card, int x, int y) {
+    public Action moveCard(Card card, int x, int y, boolean action) {
+        if (card.getPosX() == x && card.getPosY() == y) {
+            return null;
+        }
         card.setPos(x, y, cardOnBoard);
-        Rectangle bound = cardSlotBounds[y][x];
-        MoveToAction moveAction = Actions.moveTo(bound.getX(), bound.getY(), 2f, Interpolation.sineOut);
-        card.addAction(moveAction);
+        Rectangle bounds = cardSlotBounds[y][x];
+        if (action) {
+            MoveToAction moveAction = Actions.moveTo(bounds.getX(), bounds.getY(), 0.5f, Interpolation.sineOut);
+            moveAction.setActor(card);
+            return moveAction;
+        } else {
+            card.setBounds(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+        }
+        return null;
     }
 
     public Card getCardOnBoard(int row, int col) {

@@ -25,9 +25,9 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 5. slide and fill
  */
 public class MyGdxGame extends ApplicationAdapter {
-	public static int MAX_WIDTH = 600;
-	public static int MAX_HEIGHT = 1000;
-	public static int PLAYER_ACTION_COUNT = 10;
+	public static int MAX_WIDTH = 1080;
+	public static int MAX_HEIGHT = 2400;
+	public static int PLAYER_ACTION_COUNT = 3;
 	Stage stage;
 	Group game;
 	Board board;
@@ -50,53 +50,22 @@ public class MyGdxGame extends ApplicationAdapter {
 		stage.addActor(game);
 
 		// Buttons
-		int height = 30;
+		float height = game.getHeight() * 0.05f;
+		float width = 3f * height;
 		Skin skin = new Skin(Gdx.files.internal("uiskin.json"));
 		TextButton dropButton = new TextButton("Action left: " + PLAYER_ACTION_COUNT, skin);
-		dropButton.setBounds(game.getX(), 400, 200, height);
+		dropButton.setBounds(game.getWidth() - width, 0, width, height);
 		dropButton.addListener(new ClickListener() {
 			@Override
 			public void clicked(InputEvent event, float x, float y) {
 				super.clicked(event, x, y);
 				game.setTouchable(Touchable.disabled);
-				GameMechanic.blackAttack(board);
-				GameMechanic.redCaptureAttack(board);
-				GameMechanic.drop(board, false);
-				GameMechanic.drop(board, true);
-				GameMechanic.fill(board, player);
+				GameMechanic.letItFlow(board, player);
 				player.reset();
 			}
 		});
-		TextButton blackAttackButton = new TextButton("Black Attack", skin);
-		blackAttackButton.setBounds(game.getX(), dropButton.getY() - height, 200, height);
-		blackAttackButton.addListener(new ClickListener() {
-			@Override
-			public void clicked(InputEvent event, float x, float y) {
-				super.clicked(event, x, y);
-				GameMechanic.blackAttack(board);
-			}
-		});
-		TextButton redAttackButton = new TextButton("Red Attack", skin);
-		redAttackButton.setBounds(game.getX(), dropButton.getY() - height * 2, 200, height);
-		redAttackButton.addListener(new ClickListener() {
-			@Override
-			public void clicked(InputEvent event, float x, float y) {
-				super.clicked(event, x, y);
-				GameMechanic.redCaptureAttack(board);
-			}
-		});
-		TextButton fillButton = new TextButton("Fill", skin);
-		fillButton.setBounds(game.getX(), dropButton.getY() - height * 3, 200, height);
-		fillButton.addListener(new ClickListener() {
-			@Override
-			public void clicked(InputEvent event, float x, float y) {
-				super.clicked(event, x, y);
-				GameMechanic.drop(board, true);
-				GameMechanic.fill(board, player);
-			}
-		});
 		TextButton resetButton = new TextButton("Reset", skin);
-		resetButton.setBounds(game.getX(), dropButton.getY() - height, 200, height);
+		resetButton.setBounds(game.getWidth() - width, height, width, height);
 		resetButton.addListener(new ClickListener() {
 			@Override
 			public void clicked(InputEvent event, float x, float y) {
@@ -109,9 +78,6 @@ public class MyGdxGame extends ApplicationAdapter {
 		player = new Player(PLAYER_ACTION_COUNT, dropButton, game);
 
 		stage.addActor(dropButton);
-		// game.addActor(blackAttackButton);
-		// game.addActor(redAttackButton);
-		// game.addActor(fillButton);
 		stage.addActor(resetButton);
 		board = new Board(player);
 		game.addActor(board);

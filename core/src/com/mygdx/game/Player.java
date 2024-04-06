@@ -8,7 +8,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 
 public class Player {
     int actionLeft;
-    int lifeLeft;
     TextButton playerInfo;
     Group game;
 

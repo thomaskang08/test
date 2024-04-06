@@ -1,5 +1,7 @@
 package com.mygdx.game;
 
+import static com.mygdx.game.GameMechanic.attackRegion;
+
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
@@ -10,13 +12,13 @@ import java.util.Random;
 
 public class Card extends Actor {
     private final TextureRegion flippedRegion;
-    private TextureRegion region;
     private int posX;
     private int posY;
     private int value;
     Random rand = new Random();
-    boolean faceDown = true;
-    int rank;
+    boolean faceDown = false;
+    int attackFace;
+    int rank = 0;
 
     public Card(int posX, int posY, int rank, Card[][] cardOnBoard, Player player) {
         this.posX = posX;
@@ -25,8 +27,10 @@ public class Card extends Actor {
             cardOnBoard[posY][posX] = this;
         }
         this.rank = rank;
-        this.value = rand.nextInt(12) + 1;
-        region = new TextureRegion(GameMechanic.texture, (this.value - 1) * 100, this.rank * 144, 100, 144);
+        this.value = 1; //rand.nextInt(13) + 1;
+        if (rank == 2) {
+            this.attackFace = rand.nextInt(4) + 1;
+        }
         flippedRegion = new TextureRegion(GameMechanic.texture, 14 * 100, this.rank * 144, 100, 144);
         this.setZIndex(5);
         this.addListener(new InputListener(){
@@ -43,7 +47,21 @@ public class Card extends Actor {
 
     @Override
     public void draw(Batch batch, float alpha){
-        batch.draw(faceDown ? flippedRegion : region, getX(), getY(), getWidth(), getHeight());
+        batch.draw(faceDown ? flippedRegion : getRegion(), getX(), getY(), getWidth(), getHeight());
+        switch (attackFace) {
+            case 1:
+                batch.draw(attackRegion, getX() + getWidth()/2f, getY() + getHeight() - 25, getWidth() * 0.2f, getWidth() * 0.2f);
+                return;
+            case 2:
+                batch.draw(attackRegion, getX() + getWidth()/2f, getY(), getWidth() * 0.2f, getWidth() * 0.2f);
+                return;
+            case 3:
+                batch.draw(attackRegion, getX(), getY() + getHeight()/2f, getWidth() * 0.2f, getWidth() * 0.2f);
+                return;
+            case 4:
+                batch.draw(attackRegion, getX() + getWidth() - 25, getY() + getHeight()/2f, getWidth() * 0.2f, getWidth() * 0.2f);
+                return;
+        }
     }
 
     public boolean isRed() {
@@ -87,7 +105,28 @@ public class Card extends Actor {
             this.remove();
             cardOnBoard[posY][posX] = null;
         }
-        region = new TextureRegion(GameMechanic.texture, (this.value - 1) * 100, this.rank * 144, 100, 144);
+    }
+
+    private TextureRegion getRegion() {
+        if (posX == 2 && posY == 0){
+            return new TextureRegion(GameMechanic.texture, 13 * 100, this.rank * 144, 100, 144);
+        }
+        return new TextureRegion(GameMechanic.texture, (this.value - 1) * 100, this.rank * 144, 100, 144);
+    }
+
+    public Point getAttackDirection() {
+        switch (attackFace) {
+            case 1:
+                return new Point(posX, posY - 1);
+            case 2:
+                return new Point(posX, posY + 1);
+            case 3:
+                return new Point(posX - 1, posY);
+            case 4:
+                return new Point(posX + 1, posY);
+            default:
+                return null;
+        }
     }
 
     @Override
