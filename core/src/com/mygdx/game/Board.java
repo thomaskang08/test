@@ -1,25 +1,28 @@
 package com.mygdx.game;
 
-import static com.mygdx.game.GameMechanic.getCardsInPlayListener;
+import static com.mygdx.game.CardSlot.padding;
+import static com.mygdx.game.GameMechanic.fill;
+import static com.mygdx.game.ListenerProvider.getCardsInPlayListener;
+import static com.mygdx.game.MyGdxGame.TOTAL_COLUMN;
+import static com.mygdx.game.MyGdxGame.TOTAL_ROW;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.math.Interpolation;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL30;
+import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.scenes.scene2d.Action;
-import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
-import com.badlogic.gdx.scenes.scene2d.actions.MoveToAction;
-import com.badlogic.gdx.scenes.scene2d.actions.SequenceAction;
 
 import java.util.ArrayDeque;
+import java.util.Optional;
 import java.util.Queue;
 
 public class Board extends Group {
-    static int TOTAL_ROW = 5;
-    static int TOTAL_COLUMN = 3;
-    static int CARD_PER_ROW = 6;
-    Queue<Card>[] blackDeck = new ArrayDeque[TOTAL_ROW];
+    static int TOTAL_BLACK_CARDS = 10;
+    Queue<Card> blackDeck = new ArrayDeque<>();
     final Group cardSlotGroup = new Group();
     final Group cardOnBoardGroup = new Group();
     final Rectangle[][] cardSlotBounds = new Rectangle[TOTAL_COLUMN][TOTAL_ROW];
@@ -32,99 +35,71 @@ public class Board extends Group {
         this.player = player;
     }
 
-    public void initializeBoard() {
-        cardSlotGroup.clearChildren();
-        cardOnBoardGroup.clearChildren();
-        cardOnBoard = new Card[TOTAL_COLUMN][TOTAL_ROW];
-        for (int row = 0; row < TOTAL_ROW; row++) {
-            blackDeck[row] = new ArrayDeque<>();
-            for (int i = 0; i < CARD_PER_ROW; i++) {
-                blackDeck[row].add(new Card(-1, -1, 2, cardOnBoard, player));
-            }
+    public void resetBlackDeck() {
+        for (int i = 0; i < TOTAL_BLACK_CARDS; i++) {
+            Card card = new Card(-1, -1, 2, 1, player);
+            card.getColor().a = 0;
+            card.addListener(getCardsInPlayListener(card, this, player));
+            blackDeck.add(card);
         }
-        float cardWidth = (float) getParent().getWidth() / TOTAL_ROW;
-        float cardHeight = ((float) getParent().getHeight() * 0.6f / TOTAL_COLUMN);
+    }
+
+    public void setNewCardSlotBounds() {
         for (int col = 0; col < TOTAL_COLUMN; col++) {
             for (int row = 0; row < TOTAL_ROW; row++) {
                 CardSlot cardslot = new CardSlot(row, col);
-                Rectangle bound = new Rectangle(row * cardWidth, Gdx.graphics.getHeight() - (col + 1) * cardHeight, cardWidth, cardHeight);
+                Rectangle bound = new Rectangle(row * getCardWidth(), this.getHeight() - (col + 1) * getCardHeight(), getCardWidth(), getCardHeight());
                 cardSlotBounds[col][row] = bound;
                 cardSlotGroup.addActor(cardslot);
                 cardslot.setBounds(bound.x, bound.y, bound.width, bound.height);
-
-                if (col >= TOTAL_COLUMN - 2) {
-                    continue;
-                }
-                Card card = blackDeck[row].poll();
-                card.setPos(row, col, cardOnBoard);
-                card.setBounds(bound.x, getParent().getHeight() + 100, bound.getWidth(), bound.getHeight());
-                MoveToAction moveAction = Actions.moveTo(bound.getX(), bound.getY(), 2f - col * 0.4f, Interpolation.sineOut);
-                card.addAction(moveAction);
-                card.addListener(getCardsInPlayListener(card, this, player));
-                cardOnBoardGroup.addActor(card);
             }
         }
     }
 
-    public void resize() {
-        float cardWidth = (float) getParent().getWidth() / TOTAL_ROW;
-        float cardHeight = ((float) getParent().getHeight() * 0.6f / TOTAL_COLUMN);
-        for (Actor cardSlot : cardSlotGroup.getChildren()) {
-            int row = ((CardSlot) cardSlot).posX;
-            int col = ((CardSlot) cardSlot).posY;
-            Rectangle bound = new Rectangle(row * cardWidth, Gdx.graphics.getHeight() - (col + 1) * cardHeight, cardWidth, cardHeight);
-            cardSlotBounds[col][row] = bound;
-            cardSlot.setBounds(bound.x, bound.y, bound.width, bound.height);
+    public Optional<Action> spawnNewBlackCard(int row, int col) {
+        Rectangle bound = cardSlotBounds[col][row];
+        Card card = blackDeck.poll();
+        if (card != null) {
+            card.setBounds(padding + bound.x, padding + getParent().getHeight() + 100, getCardWidth() - padding, getCardHeight() - padding);
+            cardOnBoardGroup.addActor(card);
+            moveCard(card, row, col);
+            Action action = Actions.alpha(1);
+            action.setActor(card);
+            return Optional.of(action);
         }
-
-        for (Actor card : cardOnBoardGroup.getChildren()) {
-            int row = ((Card) card).getPosX();
-            int col = ((Card) card).getPosY();
-            if (row != -1) {
-                Rectangle bound = cardSlotBounds[col][row];
-                if (card.getY() == getParent().getHeight() + 100) {
-                    MoveToAction moveAction = Actions.moveTo(bound.getX(), bound.getY(), 3f, Interpolation.sineOut);
-                    card.addAction(moveAction);
-                } else {
-                    card.setBounds(bound.x, bound.y, bound.width, bound.height);
-                }
-            }
-        }
+        return Optional.empty();
     }
 
-    public void removeCardFromBoard(Card card) {
-        Rectangle bound = cardSlotBounds[card.getPosY()][card.getPosX()];
-        MoveToAction moveAction = Actions.moveTo(bound.getX(), -1, 2f, Interpolation.sineOut);
-        SequenceAction sequenceAction = new SequenceAction();
-        sequenceAction.addAction(moveAction);
-        sequenceAction.addAction(new Action() {
-            @Override
-            public boolean act(float delta) {
-                card.remove();
-                return true;
-            }
-        });
-        card.setPosX(-1, cardOnBoard);
-        card.addAction(sequenceAction);
+    public Optional<Action> init() {
+        setNewCardSlotBounds();
+        return newBoard();
     }
 
-    public Action moveCard(Card card, int x, int y, boolean action) {
+    public Optional<Action> newBoard() {
+        cardOnBoardGroup.clearChildren();
+        cardOnBoard = new Card[TOTAL_COLUMN][TOTAL_ROW];
+        resetBlackDeck();
+        return fill(this);
+    }
+
+    public void moveCard(Card card, int x, int y) {
         if (card.getPosX() == x && card.getPosY() == y) {
-            return null;
+            return;
         }
-        card.setPos(x, y, cardOnBoard);
+        card.setPos(x, y, this);
         Rectangle bounds = cardSlotBounds[y][x];
-        if (action) {
-            MoveToAction moveAction = Actions.moveTo(bounds.getX(), bounds.getY(), 0.5f, Interpolation.sineOut);
-            moveAction.setActor(card);
-            return moveAction;
-        } else {
-            card.setBounds(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
-        }
-        return null;
+        card.setBounds(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
     }
 
     public Card getCardOnBoard(int row, int col) {
         return cardOnBoard[col][row];
+    }
+
+    public float getCardWidth() {
+        return (float) this.getWidth() / TOTAL_ROW;
+    }
+
+    public float getCardHeight() {
+        return (float) this.getHeight() / TOTAL_COLUMN;
     }
 }

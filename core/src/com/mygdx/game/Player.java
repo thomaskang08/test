@@ -31,6 +31,5 @@ public class Player {
 
     public void reset() {
         setActionLeft(PLAYER_ACTION_COUNT);
-        game.setTouchable(Touchable.enabled);
     }
 }

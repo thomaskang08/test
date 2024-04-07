@@ -1,53 +1,34 @@
 package com.mygdx.game;
 
 import static com.mygdx.game.GameMechanic.attackRegion;
+import static com.mygdx.game.Textures.cardBackTexture;
+import static com.mygdx.game.Textures.cardFrontBlackTexture;
+import static com.mygdx.game.Textures.cardFrontWhiteTexture;
 
 import com.badlogic.gdx.graphics.g2d.Batch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
-import com.badlogic.gdx.scenes.scene2d.InputListener;
-
-import java.util.Random;
 
 public class Card extends Actor {
-    private final TextureRegion flippedRegion;
     private int posX;
     private int posY;
     private int value;
-    Random rand = new Random();
-    boolean faceDown = false;
+    boolean faceDown = true;
     int attackFace;
-    int rank = 0;
+    int rank;
+    final Player player;
 
-    public Card(int posX, int posY, int rank, Card[][] cardOnBoard, Player player) {
+    public Card(int posX, int posY, int rank, int value, Player player) {
         this.posX = posX;
         this.posY = posY;
-        if (posX >= 0) {
-            cardOnBoard[posY][posX] = this;
-        }
+        this.player = player;
         this.rank = rank;
-        this.value = 1; //rand.nextInt(13) + 1;
-        if (rank == 2) {
-            this.attackFace = rand.nextInt(4) + 1;
-        }
-        flippedRegion = new TextureRegion(GameMechanic.texture, 14 * 100, this.rank * 144, 100, 144);
+        this.value = value; //rand.nextInt(13) + 1;
         this.setZIndex(5);
-        this.addListener(new InputListener(){
-            @Override
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                if (Card.this.faceDown) {
-                    Card.this.faceDown = false;
-                    player.act();
-                }
-                return true;
-            }
-        });
     }
 
     @Override
     public void draw(Batch batch, float alpha){
-        batch.draw(faceDown ? flippedRegion : getRegion(), getX(), getY(), getWidth(), getHeight());
+        batch.draw(faceDown ? cardBackTexture : isRed() ? cardFrontWhiteTexture : cardFrontBlackTexture, getX(), getY(), getWidth(), getHeight());
         switch (attackFace) {
             case 1:
                 batch.draw(attackRegion, getX() + getWidth()/2f, getY() + getHeight() - 25, getWidth() * 0.2f, getWidth() * 0.2f);
@@ -68,22 +49,18 @@ public class Card extends Actor {
         return rank == 1 || rank == 3;
     }
 
-    public void setPosX(int x, Card[][] cardOnBoard) {
-        setPos(x, posY, cardOnBoard);
-    }
-
-    public void setPosY(int y, Card[][] cardOnBoard) {
-        setPos(posX, y, cardOnBoard);
-    }
-
-    public void setPos(int x, int y, Card[][] cardOnBoard) {
+    public void setPos(int x, int y, Board board) {
+        if (posX < 0 && x >= 0) {
+            this.remove();
+            board.cardOnBoardGroup.addActor(this);
+        }
         if (posX >= 0 && posY >= 0) {
-            cardOnBoard[posY][posX] = null;
+            board.cardOnBoard[posY][posX] = null;
         }
         posY = y;
         posX = x;
         if (posX >= 0 && posY >= 0) {
-            cardOnBoard[posY][posX] = this;
+            board.cardOnBoard[posY][posX] = this;
         }
     }
 
@@ -107,13 +84,6 @@ public class Card extends Actor {
         }
     }
 
-    private TextureRegion getRegion() {
-        if (posX == 2 && posY == 0){
-            return new TextureRegion(GameMechanic.texture, 13 * 100, this.rank * 144, 100, 144);
-        }
-        return new TextureRegion(GameMechanic.texture, (this.value - 1) * 100, this.rank * 144, 100, 144);
-    }
-
     public Point getAttackDirection() {
         switch (attackFace) {
             case 1:
@@ -126,6 +96,18 @@ public class Card extends Actor {
                 return new Point(posX + 1, posY);
             default:
                 return null;
+        }
+    }
+
+    public void setAttackFace(int row, int col) {
+        if (row == posX && col == posY - 1) {
+            attackFace = 1;
+        } else if (row == posX && col == posY + 1) {
+            attackFace = 2;
+        } else if (row == posX - 1 && col == posY) {
+            attackFace = 3;
+        } else if (row == posX + 1 && col == posY) {
+            attackFace = 4;
         }
     }
 

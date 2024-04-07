@@ -1,53 +1,75 @@
 package com.mygdx.game;
 
-import static com.mygdx.game.GameMechanic.getCardsInPlayListener;
+import static com.mygdx.game.ListenerProvider.getCardsInPlayListener;
+import static com.mygdx.game.MyGdxGame.HAND_DECK_VALUE;
 
-import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.scenes.scene2d.Group;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
-import com.badlogic.gdx.scenes.scene2d.InputListener;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Stack;
 
 public class Deck extends Group {
-    Stack<Card> handPile = new Stack<>();
-    Card playedCard;
+    Stack<Card> handPile;
+    Stack<Card> discardPile;
     Board board;
     Player player;
-    int cardN;
+    List<Card> drawnCards;
 
-    InputListener inputListener = new InputListener(){
-        @Override
-        public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-            Deck.this.drawCard();
-            return true;
-        }
-    };
-
-    public Deck(int cardN, Board board, Player player) {
+    public Deck(Board board, Player player) {
         this.board = board;
         this.player = player;
-        this.cardN = cardN;
-        reset();
     }
 
     public void drawCard() {
-        playedCard = handPile.pop();
-        playedCard.removeListener(inputListener);
-        playedCard.setX(playedCard.getX() + playedCard.getWidth());
-        board.cardOnBoardGroup.addActor(playedCard);
-        playedCard.addListener(getCardsInPlayListener(playedCard, board, player));
+        for (int i = 0; i < 3; i++) {
+            if (handPile.isEmpty()) {
+                shuffleDiscardToHand();
+            }
+            if (handPile.isEmpty()) {
+                return;
+            }
+            Card playedCard = handPile.pop();
+            playedCard.setBounds(getHeight() * 0.85f * i,0, getHeight() * 0.8f, getHeight() * 0.8f);
+            playedCard.clearListeners();
+            playedCard.addListener(getCardsInPlayListener(playedCard, board, player));
+            drawnCards.add(playedCard);
+        }
+    }
+
+    public void unusedToDiscardPile() {
+        drawnCards.stream().filter(card -> card.getPosX() == -1).forEach(card -> {
+            discardPile.add(card);
+            card.remove();
+        });
+        drawnCards.clear();
+    }
+
+    public void shuffleDiscardToHand() {
+        Collections.shuffle(discardPile);
+        while (!discardPile.isEmpty()) {
+            handPile.add(discardPile.pop());
+        }
+        handPile.forEach(card -> {
+            card.setBounds(0,0, getHeight() * 0.8f, getHeight() * 0.8f);
+            this.addActor(card);
+        });
     }
 
     public void reset() {
         this.clearChildren();
-        for (int i = 0; i < cardN; i++) {
-            Card card = new Card(-1, -1, 3, board.cardOnBoard, player);
-            Rectangle bound = board.cardSlotBounds[0][0];
-            card.setBounds(0,0, bound.getWidth(), bound.getHeight());
-            card.addListener(inputListener);
-            handPile.add(card);
-            this.addActor(card);
-        }
+        handPile = new Stack<>();
+        discardPile = new Stack<>();
+        drawnCards = new ArrayList<>();
+        HAND_DECK_VALUE.forEach((value, count) -> {
+            for (int i = 0; i < count; i++) {
+                Card card = new Card(-1, -1, 3, value, player);
+                card.faceDown = false;
+                handPile.add(card);
+                this.addActor(card);
+            }
+        });
+        Collections.shuffle(handPile);
     }
 }

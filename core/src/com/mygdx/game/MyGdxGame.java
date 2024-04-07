@@ -1,89 +1,88 @@
 package com.mygdx.game;
 
+import static com.mygdx.game.Textures.backgroundTexture;
 import static java.lang.Math.min;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.GL30;
+import com.badlogic.gdx.scenes.scene2d.Action;
 import com.badlogic.gdx.scenes.scene2d.Group;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
-import com.badlogic.gdx.scenes.scene2d.ui.Skin;
-import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
-import com.badlogic.gdx.utils.ScreenUtils;
-import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.utils.viewport.ExtendViewport;
+
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /*
-1. Player action: place card/flip card/move card
-2. Drop
-3. resolve black attack
-4. resolve red attack
-5. slide and fill
+todo: move action, attack direction redirect to first adjacent red
  */
 public class MyGdxGame extends ApplicationAdapter {
-	public static int MAX_WIDTH = 1080;
-	public static int MAX_HEIGHT = 2400;
-	public static int PLAYER_ACTION_COUNT = 3;
+	public static int MAX_WIDTH = 1800;
+	public static int MAX_HEIGHT = 3200;
+	public static float BOARD_PORTION = 0.24f;
+	public static int PADDING = 100;
+	public static int PLAYER_ACTION_COUNT = 1;
+	public static int TOTAL_ROW = 4;
+	public static int TOTAL_COLUMN = 4;
+	public static float BUTTON_SIZE = 100;
+	public static Map<Integer, Integer> HAND_DECK_VALUE = Stream.of(new Integer[][] {
+			{ 1, 5 },
+			{ 2, 3 },
+	}).collect(Collectors.toMap(data -> data[0], data -> data[1]));
+
 	Stage stage;
 	Group game;
 	Board board;
-	Image image;
+	Image stageImage;
 	Deck deck;
 	Player player;
+	Ui ui;
 
 	@Override
 	public void create() {
-		stage = new Stage(new ScreenViewport());
+		stage = new Stage(new ExtendViewport(1080, 2040));
+		stageImage = new Image(backgroundTexture);
+		stage.addActor(stageImage);
 		Gdx.input.setInputProcessor(stage);
 
-		Texture texture = new Texture("Belgian School Comics_asset_N8TbYDz3XxrojD97aKivsVkm_a steampunk world in an alternate universe reliant on clockwork technology, game backdrop_inference-img2img_1712103447.jpeg");
-		image = new Image(texture);
-		stage.addActor(image);
 
+		// game
 		game = new Group();
-		float gameWidth = min(stage.getWidth(), MAX_WIDTH);
-		game.setBounds(stage.getWidth()/2 - gameWidth/2, 0, gameWidth, min(stage.getHeight(), MAX_HEIGHT));
+		setGameBounds();
 		stage.addActor(game);
 
-		// Buttons
-		float height = game.getHeight() * 0.05f;
-		float width = 3f * height;
-		Skin skin = new Skin(Gdx.files.internal("uiskin.json"));
-		TextButton dropButton = new TextButton("Action left: " + PLAYER_ACTION_COUNT, skin);
-		dropButton.setBounds(game.getWidth() - width, 0, width, height);
-		dropButton.addListener(new ClickListener() {
-			@Override
-			public void clicked(InputEvent event, float x, float y) {
-				super.clicked(event, x, y);
-				game.setTouchable(Touchable.disabled);
-				GameMechanic.letItFlow(board, player);
-				player.reset();
-			}
-		});
-		TextButton resetButton = new TextButton("Reset", skin);
-		resetButton.setBounds(game.getWidth() - width, height, width, height);
-		resetButton.addListener(new ClickListener() {
-			@Override
-			public void clicked(InputEvent event, float x, float y) {
-				super.clicked(event, x, y);
-				board.initializeBoard();
-				player.reset();
-				deck.reset();
-			}
-		});
-		player = new Player(PLAYER_ACTION_COUNT, dropButton, game);
-
-		stage.addActor(dropButton);
-		stage.addActor(resetButton);
+		// board
 		board = new Board(player);
+		setBoardBounds();
 		game.addActor(board);
-		board.initializeBoard();
-		deck = new Deck(10, board, player);
+		Optional<Action> actionOptional = board.init();
+		actionOptional.ifPresent(action -> {
+			game.setTouchable(Touchable.disabled);
+			game.addAction(Actions.sequence(action, Actions.run(() -> game.setTouchable(Touchable.enabled))));
+		});
+
+		// ui
+		ui = new Ui(BUTTON_SIZE, BUTTON_SIZE * 2);
+		setUiBounds();
+		player = new Player(PLAYER_ACTION_COUNT, ui.nextButton, board);
+		game.addActor(ui);
+
+		// deck
+		deck = new Deck(board, player);
+		deck.setY(BUTTON_SIZE);
 		game.addActor(deck);
+		setDeckBounds();
+		deck.reset();
+		deck.drawCard();
+
+		ui.nextButton.addListener(ListenerProvider.getNextButtonListener(game, board, deck, player));
+		ui.resetButton.addListener(ListenerProvider.getResetButtonListener(game, board, deck, player));
 	}
 
 	@Override
@@ -93,7 +92,6 @@ public class MyGdxGame extends ApplicationAdapter {
 
 	@Override
 	public void render() {
-		ScreenUtils.clear(Color.LIME);
 		stage.act(Gdx.graphics.getDeltaTime());
 		stage.draw();
 	}
@@ -101,10 +99,30 @@ public class MyGdxGame extends ApplicationAdapter {
 	@Override
 	public void resize(int width, int height) {
 		stage.getViewport().update(width, height, true);
-		image.setBounds(0,0, stage.getWidth(), stage.getHeight());
+		stageImage.setBounds(0, 0, stage.getWidth(), stage.getHeight());
+		setGameBounds();
+		setBoardBounds();
+		setUiBounds();
+		setDeckBounds();
+	}
 
-		float gameWidth = min(stage.getWidth(), MAX_WIDTH);
-		game.setBounds(stage.getWidth()/2 - gameWidth/2,0, min(stage.getWidth(), MAX_WIDTH), min(stage.getHeight(), MAX_HEIGHT));
-		board.resize();
+	public void setGameBounds() {
+		game.setBounds(stage.getWidth()/2f - getGameWidth()/2f,0, getGameWidth(), min(stage.getHeight(), MAX_HEIGHT) - PADDING);
+	}
+
+	public void setBoardBounds() {
+		board.setBounds(0, game.getHeight() * BOARD_PORTION, game.getWidth(), game.getHeight() * (0.85f - BOARD_PORTION));
+	}
+
+	public void setUiBounds() {
+		ui.setBounds(0, 0, game.getWidth(), BUTTON_SIZE);
+	}
+
+	public void setDeckBounds() {
+		deck.setBounds(0, BUTTON_SIZE, game.getWidth(), game.getHeight() * BOARD_PORTION - BUTTON_SIZE - PADDING/4f);
+	}
+
+	public float getGameWidth() {
+		return min(stage.getWidth() - PADDING/4f, MAX_WIDTH);
 	}
 }
